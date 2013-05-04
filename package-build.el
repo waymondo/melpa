@@ -644,19 +644,28 @@ of the same-named package which is to be kept."
 The result is a list of (SOURCE . DEST), where SOURCE is a source
 file path and DEST is the relative path to which it should be copied."
   (let ((default-directory dir)
-        (prefix (if subdir
-                    (format "%s/" subdir)
-                  "")))
-    (cl-mapcan
-     (lambda (entry)
-       (if (consp entry)
-           (pb/expand-file-specs dir
-                                 (cdr entry)
-                                 (concat prefix (car entry)))
-         (mapcar (lambda (f)
-                   (cons f (concat prefix (file-name-nondirectory f))))
-                 (file-expand-wildcards entry))))
-     specs)))
+        (prefix (if subdir (format "%s/" subdir) "")))
+
+    (cl-loop for entry in specs
+             if (consp entry)
+             if (eq :exclude (car entry))
+             do (setq lst (cl-set-difference
+                           lst
+                           (pb/expand-file-specs dir (cdr entry))
+                           :key 'car
+                           :test 'equal))
+             else nconc (pb/expand-file-specs dir
+                                              (cdr entry)
+                                              (concat prefix (car entry)))
+             into lst
+             else
+             nconc (mapcar (lambda (f)
+                             (cons f (concat prefix (file-name-nondirectory f))))
+                           (file-expand-wildcards entry))
+             into lst
+             finally return lst)
+
+    ))
 
 (defun pb/expand-config-file-list (dir config)
   "In DIR, expand the :files for CONFIG using 'pb/expand-file-specs."
